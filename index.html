@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Beaver Builder: River Rescue!</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #e0f2f1;
+            font-family: 'Arial Rounded MT Bold', 'Helvetica Neue', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            width: 95vw;
+            max-width: 400px;
+            background: #fff8eb;
+            border: 6px solid #5d4037;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #ui-layer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #5d4037;
+            color: white;
+            padding: 10px 15px;
+            font-size: 1rem;
+            z-index: 5;
+        }
+
+        .stats-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        .ui-btn {
+            background: #8d6e63;
+            color: white;
+            border: 2px solid #4e342e;
+            border-radius: 5px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .ui-btn:hover { background: #795548; }
+        .ui-btn:active { background: #4e342e; }
+
+        canvas {
+            background: #e3f2fd;
+            display: block;
+            width: 100%;
+            height: auto;
+            touch-action: none;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 45px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 248, 235, 0.94);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 15px;
+            z-index: 10;
+        }
+
+        #shop-view {
+            position: absolute;
+            top: 45px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #f5f5f5;
+            display: none;
+            flex-direction: column;
+            padding: 15px;
+            z-index: 12;
+            overflow-y: auto;
+        }
+
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #5d4037;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+
+        .shop-title {
+            font-size: 1.4rem;
+            color: #5d4037;
+            margin: 0;
+        }
+
+        .box-gacha-section {
+            background: #fff;
+            border: 3px dashed #ffb300;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .collectibles-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .collectible-card {
+            background: #e0e0e0;
+            border: 2px solid #9e9e9e;
+            border-radius: 8px;
+            padding: 8px 4px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #757575;
+        }
+
+        .collectible-card.unlocked {
+            background: #fff;
+            border-color: #4caf50;
+            color: #212121;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .rarity-tag {
+            font-size: 0.65rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .btn {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 1.1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #2e7d32;
+            font-family: inherit;
+            margin-top: 10px;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        .btn-gold {
+            background: #ffb300;
+            box-shadow: 0 4px 0 #ff8f00;
+        }
+
+        #roll-result-text {
+            font-weight: bold;
+            color: #e65100;
+            margin-top: 6px;
+            min-height: 18px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui-layer">
+            <div class="stats-group">
+                <div>🌊 Lvl: <span id="level-display">1</span></div>
+                <div>🪙 <span id="coin-display">50</span></div>
+                <div>🪵 <span id="log-count">0/6</span></div>
+            </div>
+            <div class="control-group">
+                <button class="ui-btn" id="shop-trigger-btn" onclick="openShop()">🛒 SHOP</button>
+                <button class="ui-btn" id="pause-btn" onclick="togglePause()">⏸️ PAUSE</button>
+                <button class="ui-btn" onclick="resetEntireGame()">🔄 RESTART</button>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="400" height="530"></canvas>
+
+        <div id="overlay">
+            <h2 id="title-text">🦫 Beaver Builder! 🌊</h2>
+            <p id="body-text">The river is rushing! Tap anywhere instantly to drop logs and construct a bridge tower.</p>
+            <button class="btn" id="action-btn" onclick="startRound()">START RESCUE</button>
+        </div>
+
+        <div id="shop-view">
+            <div class="shop-header">
+                <h3 class="shop-title">🦫 Trading Post</h3>
+                <button class="ui-btn" style="background:#f44336; border-color:#b71c1c;" onclick="closeShop()">🏠 HOME</button>
+            </div>
+
+            <div class="box-gacha-section">
+                <h4>🎁 Secret Timber Crate</h4>
+                <p style="margin: 4px 0; font-size:0.8rem; color:#616161;">Crack open a crate for random cosmetic items!</p>
+                <button class="btn btn-gold" onclick="buyLootBox()">OPEN CRATE (🪙 100)</button>
+                <div id="roll-result-text"></div>
+            </div>
+
+            <h4 style="margin: 5px 0 8px 0; color:#5d4037;">🏆 Unlocked Items</h4>
+            <div class="collectibles-grid" id="collectibles-display-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let score = 0;
+        let coins = 50; 
+        let level = 1;
+        let gameRunning = false;
+        let isPaused = false;
+        let logsPlaced = 0;
+        const maxLogs = 6;
+
+        let currentLogWidth = 100; 
+        let currentCraneSpeed = 2.4;
+        let currentWaterForce = 0.022;
+
+        let craneX = 50;
+        let craneDirection = 1;
+        const leftBankWidth = 80;   
+        const rightBankWidth = 80;
+        const groundY = 440;        
+
+        let droppedLogs = [];
+        let currentActiveLog = null;
+        let beaverX = -30;
+        let beaverTestingActive = false;
+
+        const COLLECTIBLES = [
+            { id: "gold_axe", name: "✨ Golden Axe", rarity: "legendary", chance: 0.05, icon: "🪓" },
+            { id: "hard_hat", name: "Safety Helmet", rarity: "rare", chance: 0.15, icon: "🪖" },
+            { id: "flannel", name: "Plaid Flannel", rarity: "rare", chance: 0.20, icon: "👔" },
+            { id: "goggles", name: "Splash Goggles", rarity: "common", chance: 0.20, icon: "🥽" },
+            { id: "pancake", name: "Flapjack", rarity: "common", chance: 0.20, icon: "🥞" },
+            { id: "maple", name: "Syrup Bottle", rarity: "common", chance: 0.20, icon: "🍁" }
+        ];
+        
+        let unlockedInventory = {
+            gold_axe: false, hard_hat: false, flannel: false, goggles: false, pancake: false, maple: false
+        };
+
+        class LogBlock {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = currentLogWidth; 
+                this.height = 24;
+                this.vy = 0;
+                this.vx = 0;
+                this.isStatic = false;
+            }
+
+            updatePhysics() {
+                if (this.isStatic || isPaused) return;
+
+                this.vy += 0.3; 
+                this.y += this.vy;
+
+                if (this.y > 180 && this.x > leftBankWidth - 25 && (this.x + this.width) < (canvas.width - rightBankWidth + 25)) {
+                    this.vx += currentWaterForce; 
+                    this.x += this.vx;
+                }
+
+                if (this.y + this.height >= groundY) {
+                    if (this.x <= leftBankWidth || (this.x + this.width) >= (canvas.width - rightBankWidth)) {
+                        this.y = groundY - this.height;
+                        this.settleLog();
+                    }
+                }
+
+                for (let other of droppedLogs) {
+                    if (other === this) continue;
+                    if (this.checkCollision(other)) {
+                        this.y = other.y - this.height;
+                        this.settleLog();
+                    }
+                }
+
+                if (this.y > canvas.height || this.x > canvas.width || this.x + this.width < 0) {
+                    this.destroyLog();
+                }
+            }
+
+            checkCollision(other) {
+                return (this.x < other.x + other.width &&
+                        this.x + this.width > other.x &&
+                        this.y < other.y + other.height &&
+                        this.y + this.height > other.y);
+            }
+
+            settleLog() {
+                this.vy = 0;
+                this.vx = 0;
+                this.isStatic = true;
+                awardCoins(5);
+            }
+
+            destroyLog() {
+                this.isStatic = true; 
+                let index = droppedLogs.indexOf(this);
+                if (index > -1) droppedLogs.splice(index, 1);
+                checkRoundEndState();
+            }
+
+            draw() {
+                ctx.fillStyle = '#8d6e63';
+                ctx.strokeStyle = '#4e342e';
+                ctx.lineWidth = 3;
+                
+                ctx.beginPath();
+                ctx.roundRect(this.x, this.y, this.width, this.height, 6);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#bcaaa4';
+                ctx.beginPath();
+                ctx.arc(this.x + 6, this.y + this.height/2, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            e.preventDefault(); 
+            if (!gameRunning || isPaused || currentActiveLog || beaverTestingActive) return;
+            if (logsPlaced >= maxLogs) return;
+
+            let newLog = new LogBlock(craneX - (currentLogWidth / 2), 55);
+            currentActiveLog = newLog;
+            droppedLogs.push(newLog);
+            
+            logsPlaced++;
+            document.getElementById('log-count').innerText = `${logsPlaced}/${maxLogs}`;
+        });
+
+        function awardCoins(amount) {
+            coins += amount;
+            document.getElementById('coin-display').innerText = coins;
+        }
+
+        function togglePause() {
+            if (!gameRunning) return; 
+            isPaused = !isPaused;
+            const btn = document.getElementById('pause-btn');
+            
+            if (isPaused) {
+                btn.innerText = "▶️ RESUME";
+                document.getElementById('overlay').style.display = 'flex';
+                document.getElementById('title-text').innerText = "Game Paused";
+                document.getElementById('body-text').innerText = "Take a breath! The beaver family is waiting.";
+                document.getElementById('action-btn').style.display = 'none';
+            } else {
+                btn.innerText = "⏸️ PAUSE";
+                document.getElementById('overlay').style.display = 'none';
+            }
+        }
+
+        function openShop() {
+            isPaused = true;
+            document.getElementById('pause-btn').innerText = "▶️ RESUME";
+            document.getElementById('roll-result-text').innerText = "";
+            renderCollectiblesGrid();
+            document.getElementById('shop-view').style.display = 'flex';
+        }
+
+        function closeShop() {
+            document.getElementById('shop-view').style.display = 'none';
+            if(gameRunning) {
+                document.getElementById('overlay').style.display = 'flex';
+                document.getElementById('title-text').innerText = "Paused Management";
+                document.getElementById('body-text').innerText = "Ready to build again?";
+                document.getElementById('action-btn').style.display = 'none';
+            }
+        }
+
+        function buyLootBox() {
+            const resultMsg = document.getElementById('roll-result-text');
+            if (coins < 100) {
+                resultMsg.style.color = "#d32f2f";
+                resultMsg.innerText = "❌ Need 100 coins!";
+                return;
+            }
+
+            coins -= 100;
+            document.getElementById('coin-display').innerText = coins;
+
+            let rand = Math.random();
+            let cumulativeChance = 0;
+            let selectedReward = COLLECTIBLES[COLLECTIBLES.length - 1];
+
+            for (let item of COLLECTIBLES) {
+                cumulativeChance += item.chance;
+                if (rand <= cumulativeChance) {
+                    selectedReward = item;
+                    break;
+                }
+            }
+
+            let isNew = !unlockedInventory[selectedReward.id];
+            unlockedInventory[selectedReward.id] = true;
+
+            resultMsg.style.color = selectedReward.rarity === 'legendary' ? '#e65100' : '#2e7d32';
+            resultMsg.innerText = `${isNew ? '🆕 GOT:' : '🎉 DUP:'} ${selectedReward.icon} ${selectedReward.name}`;
+
+            renderCollectiblesGrid();
+        }
+
+        function renderCollectiblesGrid() {
+            const grid = document.getElementById('collectibles-display-grid');
+            grid.innerHTML = "";
+
+            COLLECTIBLES.forEach(item => {
+                const hasIt = unlockedInventory[item.id];
+                const card = document.createElement('div');
+                card.className = `collectible-card ${hasIt ? 'unlocked' : ''}`;
+                
+                let rarityColor = item.rarity === 'legendary' ? '#ff6d00' : (item.rarity === 'rare' ? '#00b0ff' : '#757575');
+
+                card.innerHTML = `
+                    <div style="font-size: 1.5rem; margin-bottom:2px;">${hasIt ? item.icon : '❓'}</div>
+                    <div style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${hasIt ? item.name : '???'}</div>
+                    <div class="rarity-tag" style="color: ${rarityColor};">${item.rarity}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function resetEntireGame() {
+            score = 0;
+            coins = 50;
+            level = 1;
+            isPaused = false;
+            document.getElementById('pause-btn').innerText = "⏸️ PAUSE";
+            document.getElementById('level-display').innerText = level;
+            document.getElementById('coin-display').innerText = coins;
+            document.getElementById('action-btn').style.display = 'inline-block';
+            calculateLevelModifiers();
+            startRound();
+        }
+
+        function calculateLevelModifiers() {
+            currentLogWidth = Math.max(75, 100 - (level - 1) * 4);       
+            currentCraneSpeed = Math.min(4.8, 2.4 + (level - 1) * 0.25);   
+            currentWaterForce = Math.min(0.05, 0.022 + (level - 1) * 0.004); 
+        }
+
+        function startRound() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('action-btn').style.display = 'inline-block';
+            droppedLogs = [];
+            currentActiveLog = null;
+            logsPlaced = 0;
+            beaverX = -30;
+            beaverTestingActive = false;
+            isPaused = false;
+            gameRunning = true;
+            document.getElementById('log-count').innerText = `0/${maxLogs}`;
+            document.getElementById('level-display').innerText = level;
+        }
+
+        function updateEngineLoop() {
+            if (gameRunning && !isPaused) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#29b6f6';
+                ctx.fillRect(leftBankWidth, groundY - 260, canvas.width - leftBankWidth - rightBankWidth, 360);
+
+                ctx.strokeStyle = '#b3e5fc';
+                ctx.lineWidth = 4;
+                for(let resY = groundY - 220; resY < canvas.height; resY += 50) {
+                    ctx.beginPath();
+                    ctx.moveTo(leftBankWidth, resY);
+                    ctx.lineTo(canvas.width - rightBankWidth, resY);
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = '#8d6e63';
+                ctx.fillRect(0, groundY, leftBankWidth, canvas.height - groundY);
+                ctx.fillRect(canvas.width - rightBankWidth, groundY, rightBankWidth, canvas.height - groundY);
+
+                ctx.fillStyle = '#66bb6a';
+                ctx.fillRect(0, groundY, leftBankWidth, 15);
+                ctx.fillRect(canvas.width - rightBankWidth, groundY, rightBankWidth, 15);
+
+                if (!beaverTestingActive && logsPlaced < maxLogs) {
+                    craneX += currentCraneSpeed * craneDirection;
+                    if (craneX > canvas.width - 30 || craneX < 30) {
+                        craneDirection *= -1;
+                    }
+
+                    ctx.fillStyle = '#37474f';
+                    ctx.fillRect(craneX - 12, 0, 24, 20);
+                    ctx.strokeStyle = '#37474f';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(craneX, 20);
+                    ctx.lineTo(craneX, 55);
+                    ctx.stroke();
+
+                    if (!currentActiveLog) {
+                        ctx.globalAlpha = 0.4;
+                        ctx.fillStyle = '#8d6e63';
+                        ctx.fillRect(craneX - (currentLogWidth / 2), 55, currentLogWidth, 24);
+                        ctx.globalAlpha = 1.0;
+                    }
+                }
+
+                droppedLogs.forEach(log => {
+                    log.updatePhysics();
+                    log.draw();
+                });
+
+                if (currentActiveLog && currentActiveLog.isStatic) {
+                    currentActiveLog = null;
+                    checkRoundEndState();
+                }
+
+                if (beaverTestingActive) {
+                    runBeaverCrossTestLogic();
+                }
+            }
+
+            requestAnimationFrame(updateEngineLoop);
+        }
+
+        function checkRoundEndState() {
+            if (logsPlaced >= maxLogs && !currentActiveLog && !beaverTestingActive) {
+                beaverTestingActive = true;
+                beaverX = 10;
+            }
+        }
+
+        function runBeaverCrossTestLogic() {
+            beaverX += 1.5; 
+            let targetY = groundY - 22; 
+            
+            if (beaverX > leftBankWidth - 10 && beaverX < canvas.width - rightBankWidth + 10) {
+                let structuralFound = false;
+                
+                for (let log of droppedLogs) {
+                    if (beaverX >= log.x - 20 && beaverX <= log.x + log.width + 20) {
+                        if (Math.abs(targetY - (log.y - 22)) < 60 || targetY === groundY - 22) {
+                            targetY = log.y - 22; 
+                            structuralFound = true;
+                        }
+                    }
+                }
+                
+                if (!structuralFound) {
+                    targetY = groundY + 30; 
+                    executeRoundFailure();
+                    return;
+                }
+            }
+
+            ctx.fillStyle = '#5d4037';
+            ctx.beginPath();
+            ctx.arc(beaverX, targetY, 11, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(beaverX - 6, targetY - 9, 4, 0, Math.PI * 2);
+            ctx.arc(beaverX + 6, targetY - 9, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (beaverX > canvas.width - 15) {
+                executeRoundSuccess();
+            }
+        }
+
+        function executeRoundSuccess() {
+            gameRunning = false;
+            score += 100;
+            level += 1;
+            awardCoins(50);
+            calculateLevelModifiers(); 
+            
+            document.getElementById('overlay').style.display = 'flex';
+            document.getElementById('title-text').innerText = `🎉 Level ${level - 1} Clear! 🎉`;
+            document.getElementById('body-text').innerText = `Bridge Secure! Payout: +50 bonus coins. Ready for Level ${level}?`;
+            document.getElementById('action-btn').innerText = "START NEXT LEVEL";
+        }
+
+        function executeRoundFailure() {
+            gameRunning = false;
+            document.getElementById('overlay').style.display = 'flex';
+            document.getElementById('title-text').innerText = "🌊 Splash! 🌊";
+            document.getElementById('body-text').innerText = "The structure buckled into the river. Try this setup again!";
+            document.getElementById('action-btn').innerText = "TRY AGAIN";
+        }
+
+        requestAnimationFrame(updateEngineLoop);
+    </script>
+</body>
+</html>
